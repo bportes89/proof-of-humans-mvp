@@ -13,8 +13,8 @@ from pipeline.respiration import RespirationAnalyzer
 from pipeline.biometrics import BiometricEngine
 
 class PipelineManager:
-    def __init__(self):
-        self.camera = ThermalCamera()
+    def __init__(self, camera_index=None):
+        self.camera = ThermalCamera(camera_index=camera_index)
         self.detector = ThermalFaceDetector()
         self.biometrics = BiometricEngine()
         

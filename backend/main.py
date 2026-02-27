@@ -1,16 +1,26 @@
+import os
+import sys
+import time
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import sys
-import os
-import time
 
 # Add root directory to path to import pipeline
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from pipeline.manager import pipeline
+from pipeline.manager import PipelineManager
+
+# Check for CAMERA_INDEX env var
+camera_idx = os.getenv("CAMERA_INDEX", None)
+if camera_idx is not None:
+    try:
+        camera_idx = int(camera_idx)
+    except ValueError:
+        camera_idx = None
+
+pipeline = PipelineManager(camera_index=camera_idx)
 
 app = FastAPI(title="Proof of Humans API")
 
