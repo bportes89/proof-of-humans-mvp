@@ -28,7 +28,22 @@ Provar que há um humano vivo na frente da câmera através de:
 /tests          # Scripts de teste e debug
 ```
 
-## 🛠️ Instalação e Execução
+## 🛠️ Instalação e Execução Rápida
+
+### Opção 1: Scripts Automáticos (Recomendado)
+
+**Windows:**
+1. Dê dois cliques no arquivo `run.bat`.
+
+**Mac/Linux:**
+1. Abra o terminal na pasta do projeto.
+2. Rode:
+   ```bash
+   chmod +x run.sh
+   ./run.sh
+   ```
+
+### Opção 2: Instalação Manual
 
 1.  **Clone o repositório** (se ainda não o fez):
     ```bash
