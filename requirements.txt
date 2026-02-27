@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+numpy
+opencv-python
+requests
+scipy
+pydantic
+python-multipart

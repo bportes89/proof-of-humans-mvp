@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proof of Humans MVP</title>
+    <style>
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background: #222; color: #fff; }
+        #container { width: 800px; text-align: center; }
+        #video-feed { width: 640px; height: 480px; border: 2px solid #555; background: #000; margin-bottom: 20px; }
+        .controls { margin: 20px; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 4px; margin: 0 10px; }
+        button:disabled { background: #555; cursor: not-allowed; }
+        #status-panel { background: #333; padding: 15px; border-radius: 8px; text-align: left; margin-top: 20px; }
+        .status-item { margin: 5px 0; }
+        .status-label { font-weight: bold; color: #aaa; }
+        #proof-box { margin-top: 20px; background: #1a4d1a; padding: 15px; border-radius: 8px; display: none; word-break: break-all; }
+        .challenge { color: #ffcc00; font-size: 1.2em; font-weight: bold; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <h1>Proof of Humans (Thermal + Breath)</h1>
+        
+        <div id="connection-status" style="color: red; font-weight: bold; margin-bottom: 10px; display: none;">OFFLINE - Servidor desconectado</div>
+
+        <div id="video-wrapper">
+            <!-- MJPEG Stream -->
+            <img id="video-feed" src="/video_feed" alt="Thermal Feed" onerror="this.style.display='none'; document.getElementById('video-placeholder').style.display='block';">
+            <div id="video-placeholder" style="display:none; width:640px; height:480px; background:#333; line-height:480px; color:#fff;">Vídeo Indisponível</div>
+        </div>
+
+        <div class="controls">
+            <input type="text" id="user-id" placeholder="Enter User ID" value="test_user_1">
+            <button onclick="startEnroll()" id="btn-enroll">Enroll</button>
+            <button onclick="startVerify()" id="btn-verify">Verify</button>
+        </div>
+
+        <div id="challenge-display" class="challenge"></div>
+        <div id="error-msg" style="color: red; margin: 10px 0;"></div>
+
+        <div id="status-panel">
+            <div class="status-item"><span class="status-label">Session State:</span> <span id="state">IDLE</span></div>
+            <div class="status-item"><span class="status-label">Face Detected:</span> <span id="face">No</span></div>
+            <div class="status-item"><span class="status-label">RPM:</span> <span id="rpm">0.0</span></div>
+            <div class="status-item"><span class="status-label">Signal Quality:</span> <span id="quality">0.0</span></div>
+        </div>
+
+        <div id="proof-box">
+            <h3>Human Proof Generated!</h3>
+            <pre id="proof-content"></pre>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = window.location.origin; // Usa a mesma origem da página
+        let pollingInterval = null;
+
+        // Check connection periodically
+        setInterval(async () => {
+            try {
+                await fetch(`${API_URL}/status`);
+                document.getElementById('connection-status').style.display = 'none';
+                document.getElementById('video-feed').style.display = 'block';
+                document.getElementById('video-placeholder').style.display = 'none';
+            } catch (e) {
+                document.getElementById('connection-status').style.display = 'block';
+            }
+        }, 2000);
+
+        function showError(msg) {
+            const el = document.getElementById('error-msg');
+            el.innerText = msg;
+            setTimeout(() => el.innerText = '', 5000);
+        }
+
+        async function startEnroll() {
+            const userId = document.getElementById('user-id').value;
+            if (!userId) return alert("Enter User ID");
+            
+            try {
+                const res = await fetch(`${API_URL}/enroll`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: userId })
+                });
+                if (!res.ok) throw new Error(await res.text());
+                const data = await res.json();
+                console.log(data);
+                startPolling();
+                document.getElementById('challenge-display').innerText = "Please breathe naturally for 10 seconds...";
+                document.getElementById('proof-box').style.display = 'none';
+            } catch (e) {
+                showError("Error starting enrollment: " + e.message);
+            }
+        }
+
+        async function startVerify() {
+            const userId = document.getElementById('user-id').value;
+            if (!userId) return alert("Enter User ID");
+
+            try {
+                const res = await fetch(`${API_URL}/verify`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: userId })
+                });
+                if (!res.ok) throw new Error(await res.text());
+                const data = await res.json();
+                console.log(data);
+                startPolling();
+                document.getElementById('challenge-display').innerText = "Perform a DEEP BREATH now!";
+                document.getElementById('proof-box').style.display = 'none';
+            } catch (e) {
+                showError("Error starting verification: " + e.message);
+            }
+        }
+
+        function startPolling() {
+            if (pollingInterval) clearInterval(pollingInterval);
+            pollingInterval = setInterval(pollStatus, 500);
+        }
+
+        async function pollStatus() {
+            try {
+                const res = await fetch(`${API_URL}/status`);
+                const status = await res.json();
+                
+                document.getElementById('state').innerText = status.state;
+                document.getElementById('face').innerText = status.face_detected ? "YES" : "NO";
+                document.getElementById('rpm').innerText = status.rpm.toFixed(1);
+                document.getElementById('quality').innerText = (status.signal_quality * 100).toFixed(0) + "%";
+
+                if (status.state === "COMPLETED" && status.proof) {
+                    clearInterval(pollingInterval);
+                    document.getElementById('proof-box').style.display = 'block';
+                    document.getElementById('proof-content').innerText = JSON.stringify(status.proof, null, 2);
+                    document.getElementById('challenge-display').innerText = "Success!";
+                } else if (status.state === "FAILED") {
+                    clearInterval(pollingInterval);
+                    document.getElementById('challenge-display').innerText = "Failed / Timeout";
+                }
+
+            } catch (e) {
+                console.error("Polling error", e);
+            }
+        }
+    </script>
+</body>
+</html>
