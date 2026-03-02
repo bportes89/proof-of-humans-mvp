@@ -53,16 +53,27 @@ class ThermalCamera:
         if self.cap:
             ret, frame = self.cap.read()
             if ret:
-                # Convert to grayscale (thermal cameras usually output 1 channel or grayscale RGB)
+                # Se for câmera colorida (webcam normal), converte para grayscale
                 if len(frame.shape) == 3:
                     frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
                 
-                # Normalize 0-255 to approx 20-38°C for compatibility with our algorithm
-                # This is a naive mapping! Real radiometric data needs SDK.
-                frame_float = frame.astype(np.float32)
+                # Normalização "Fake Thermal" para Webcam Comum
+                # A webcam comum vê luz visível (0-255).
+                # Vamos fingir que partes claras são "quentes" e escuras são "frias"
+                # só para o algoritmo de detecção de face funcionar e você ver algo na tela.
                 
-                # Mapping: 0 -> 20°C, 255 -> 40°C
-                frame_temp = 20.0 + (frame_float / 255.0) * 20.0
+                # Converter para float32
+                frame_float = frame.astype(np.float32)
+
+                # Mapeamento:
+                # Pixel 0 (Preto)   -> 20°C (Frio)
+                # Pixel 255 (Branco)-> 38°C (Quente)
+                # Isso permite que o detector de "Face Térmica" ache seu rosto se estiver iluminado.
+                frame_temp = 20.0 + (frame_float / 255.0) * 18.0
+                
+                # Inverter horizontalmente (espelho) para ficar mais natural
+                frame_temp = cv2.flip(frame_temp, 1)
+                
                 return frame_temp
             else:
                 print("Warning: Failed to read frame from camera.")
