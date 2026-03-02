@@ -90,5 +90,25 @@ class ThermalFaceDetector:
                     return True, (int(x), int(y), int(w), int(h)), score
         except Exception as e:
             print(f"Erro no fallback térmico: {e}")
-            
-        return False, None, 0.0
+
+        # --- ESTRATÉGIA 3: Fallback Geométrico (Central ROI) ---
+        # Se tudo falhar (imagem muito ruidosa, baixo contraste térmico, OBS colorido confuso),
+        # assumimos que o usuário está posicionado no CENTRO da tela (UX padrão).
+        # Retornamos um quadrado fixo no meio da imagem.
+        
+        height, width = frame.shape[:2]
+        center_x, center_y = width // 2, height // 2
+        
+        # Tamanho estimado do rosto (ex: 1/3 da largura da tela)
+        face_w = int(width * 0.35)
+        face_h = int(face_w * 1.3) # Proporção áurea aproximada
+        
+        x = max(0, center_x - face_w // 2)
+        y = max(0, center_y - face_h // 2)
+        
+        # Garantir que está dentro da imagem
+        w = min(width - x, face_w)
+        h = min(height - y, face_h)
+        
+        # Score baixo para indicar que foi "chute"
+        return True, (int(x), int(y), int(w), int(h)), 0.5
