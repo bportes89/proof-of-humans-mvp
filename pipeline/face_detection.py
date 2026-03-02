@@ -23,9 +23,7 @@ class ThermalFaceDetector:
             return False, None, 0.0
 
         # --- ESTRATÉGIA 1: Detecção Padrão (Haar Cascade) ---
-        # Como estamos usando uma webcam simulada que converte luz em "temperatura",
-        # a imagem ainda tem características visuais fortes (olhos, nariz, boca).
-        # O Haar Cascade é MUITO mais robusto que limiar de temperatura simples para isso.
+        # Tenta achar rosto com características visuais (olhos, nariz)
         
         # Converter frame float (20.0-38.0) de volta para uint8 (0-255) para o detector
         # Mapeamento inverso aproximado: 20->0, 38->255
@@ -49,32 +47,48 @@ class ThermalFaceDetector:
             return True, (int(x), int(y), int(w), int(h)), 0.95 # Alta confiança
 
         # --- ESTRATÉGIA 2: Fallback Térmico (Blob Quente) ---
-        # Se o Haar falhar (ex: imagem térmica real muito borrada ou sem detalhes visuais),
-        # tentamos achar uma região quente.
+        # Se o Haar falhar, tentamos achar uma região quente.
+        # IMPORTANTE: Quando usamos OBS Virtual Camera com imagens coloridas (Ironbow/Rainbow),
+        # o "frame" que chega aqui pode não ser uma matriz de temperatura limpa.
+        # Precisamos ser robustos.
         
-        # Simple thresholding: Humans are warm (usually > min_temp)
-        mask = (frame > self.min_temp).astype(np.uint8) * 255
+        # Se o frame parece ser uma imagem normal convertida (valores ~20-38), usamos threshold simples.
+        # Mas se for imagem colorida capturada pelo OBS, os valores podem estar bagunçados na conversão grayscale.
         
-        # Find contours
-        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        # Vamos tentar binarizar com Otsu (automático) para separar frente/fundo
+        # Isso funciona bem se o rosto for a coisa mais brilhante (quente) na imagem, 
+        # que é o caso típico de termografia (rosto amarelo/vermelho vs fundo azul/verde).
         
-        best_cnt = None
-        max_area = 0
-        
-        for cnt in contours:
-            area = cv2.contourArea(cnt)
-            if area > self.min_area:
-                if area > max_area:
-                    max_area = area
-                    best_cnt = cnt
-        
-        if best_cnt is not None:
-            x, y, w, h = cv2.boundingRect(best_cnt)
+        try:
+            # Converter para uint8 para Otsu
+            frame_u8 = cv2.normalize(frame, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
             
-            # Basic geometric check (aspect ratio of a face is roughly 1:1.3 or so)
-            aspect_ratio = h / w
-            if 0.5 < aspect_ratio < 2.0: # Relaxei um pouco os limites
-                score = min(1.0, max_area / (self.min_area * 5))
-                return True, (x, y, w, h), score
+            # Threshold de Otsu (separa automaticamente o pico mais claro)
+            _, mask_otsu = cv2.threshold(frame_u8, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+            
+            # Find contours
+            contours, _ = cv2.findContours(mask_otsu, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            
+            best_cnt = None
+            max_area = 0
+            
+            for cnt in contours:
+                area = cv2.contourArea(cnt)
+                # Area mínima um pouco menor para garantir detecção
+                if area > self.min_area * 0.5: 
+                    if area > max_area:
+                        max_area = area
+                        best_cnt = cnt
+            
+            if best_cnt is not None:
+                x, y, w, h = cv2.boundingRect(best_cnt)
+                
+                # Checagem geométrica relaxada
+                aspect_ratio = h / w
+                if 0.5 < aspect_ratio < 2.0: 
+                    score = min(1.0, max_area / (self.min_area * 5))
+                    return True, (int(x), int(y), int(w), int(h)), score
+        except Exception as e:
+            print(f"Erro no fallback térmico: {e}")
             
         return False, None, 0.0
