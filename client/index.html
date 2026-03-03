@@ -3,136 +3,390 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Proof of Humans MVP</title>
+    <title>Proof of Humans | Biometric Liveness</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
     <style>
-        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background: #222; color: #fff; }
-        #container { width: 800px; text-align: center; }
-        #video-feed { width: 640px; height: 480px; border: 2px solid #555; background: #000; margin-bottom: 20px; }
-        .controls { margin: 20px; }
-        button { padding: 10px 20px; font-size: 16px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 4px; margin: 0 10px; }
-        button:disabled { background: #555; cursor: not-allowed; }
-        #status-panel { background: #333; padding: 15px; border-radius: 8px; text-align: left; margin-top: 20px; }
-        .status-item { margin: 5px 0; }
-        .status-label { font-weight: bold; color: #aaa; }
-        #proof-box { margin-top: 20px; background: #1a4d1a; padding: 15px; border-radius: 8px; display: none; word-break: break-all; }
-        .challenge { color: #ffcc00; font-size: 1.2em; font-weight: bold; margin: 10px 0; }
+        body { font-family: 'Inter', sans-serif; background-color: #0f172a; }
+        
+        /* Glassmorphism */
+        .glass {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        /* Breathing Animation */
+        @keyframes breathe {
+            0%, 100% { transform: scale(1); opacity: 0.3; }
+            50% { transform: scale(1.5); opacity: 0.1; }
+        }
+        .breathing-circle {
+            animation: breathe 8s infinite ease-in-out;
+        }
+        
+        /* Scan Line Animation */
+        @keyframes scan {
+            0% { top: 0%; opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { top: 100%; opacity: 0; }
+        }
+        .scan-line {
+            position: absolute;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(to right, transparent, #3b82f6, transparent);
+            animation: scan 3s linear infinite;
+            display: none;
+        }
+        .scanning .scan-line { display: block; }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
     </style>
 </head>
-<body>
-    <div id="container">
-        <h1>Proof of Humans (Thermal + Breath)</h1>
+<body class="text-white min-h-screen flex flex-col">
+
+    <!-- Navbar -->
+    <nav class="w-full glass sticky top-0 z-50 px-6 py-4 flex justify-between items-center shadow-lg">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center text-xl font-bold">
+                <i class="fa-solid fa-fingerprint"></i>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold tracking-tight">Proof of Humans</h1>
+                <p class="text-xs text-gray-400">Thermal + Breath Liveness MVP</p>
+            </div>
+        </div>
         
-        <div id="connection-status" style="color: red; font-weight: bold; margin-bottom: 10px; display: none;">OFFLINE - Servidor desconectado</div>
+        <div id="connection-status" class="hidden px-3 py-1 bg-red-500/20 text-red-400 text-sm rounded-full border border-red-500/30 flex items-center gap-2">
+            <div class="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+            Offline
+        </div>
+        <div id="connection-online" class="hidden px-3 py-1 bg-green-500/20 text-green-400 text-sm rounded-full border border-green-500/30 flex items-center gap-2">
+            <div class="w-2 h-2 bg-green-500 rounded-full"></div>
+            Online
+        </div>
+    </nav>
 
-        <div id="video-wrapper">
-            <!-- MJPEG Stream -->
-            <img id="video-feed" src="/video_feed" alt="Thermal Feed" onerror="this.style.display='none'; document.getElementById('video-placeholder').style.display='block';">
-            <div id="video-placeholder" style="display:none; width:640px; height:480px; background:#333; line-height:480px; color:#fff;">Vídeo Indisponível</div>
+    <!-- Main Content -->
+    <main class="flex-1 container mx-auto p-6 flex flex-col lg:flex-row gap-8 items-start justify-center">
+        
+        <!-- Left Column: Video Feed -->
+        <div class="w-full lg:w-2/3 flex flex-col gap-6">
+            
+            <!-- Video Card -->
+            <div class="glass rounded-2xl p-1 relative overflow-hidden shadow-2xl ring-1 ring-white/10">
+                <div class="relative rounded-xl overflow-hidden bg-black aspect-video flex items-center justify-center group">
+                    
+                    <!-- MJPEG Stream -->
+                    <img id="video-feed" src="/video_feed" class="w-full h-full object-cover" alt="Thermal Feed" 
+                         onerror="this.style.display='none'; document.getElementById('video-placeholder').style.display='flex';">
+                    
+                    <!-- Placeholder -->
+                    <div id="video-placeholder" class="hidden absolute inset-0 flex-col items-center justify-center text-gray-500 bg-gray-900 z-10">
+                        <i class="fa-solid fa-video-slash text-4xl mb-4"></i>
+                        <p>Camera Feed Unavailable</p>
+                    </div>
+
+                    <!-- Overlay UI -->
+                    <div id="overlay-ui" class="absolute inset-0 pointer-events-none flex flex-col items-center justify-center">
+                        
+                        <!-- Face Guide Box -->
+                        <div id="face-guide" class="w-64 h-80 border-2 border-dashed border-white/30 rounded-3xl relative transition-all duration-300">
+                            <div class="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-blue-500 -mt-0.5 -ml-0.5 rounded-tl-lg"></div>
+                            <div class="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-blue-500 -mt-0.5 -mr-0.5 rounded-tr-lg"></div>
+                            <div class="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-blue-500 -mb-0.5 -ml-0.5 rounded-bl-lg"></div>
+                            <div class="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-blue-500 -mb-0.5 -mr-0.5 rounded-br-lg"></div>
+                            
+                            <!-- Scan Line -->
+                            <div class="scan-line"></div>
+
+                            <!-- Center Target -->
+                            <div class="absolute inset-0 flex items-center justify-center opacity-30">
+                                <i class="fa-solid fa-plus text-white text-2xl"></i>
+                            </div>
+                        </div>
+
+                        <!-- Status Badge Overlay -->
+                        <div class="absolute top-4 left-4 flex gap-2">
+                             <span id="face-badge" class="px-3 py-1 bg-black/60 backdrop-blur-md rounded-full text-xs font-semibold text-gray-400 border border-white/10">
+                                <i class="fa-solid fa-user-xmark mr-1"></i> No Face
+                            </span>
+                            <span id="state-badge" class="px-3 py-1 bg-blue-600/80 backdrop-blur-md rounded-full text-xs font-semibold text-white border border-blue-400/30">
+                                IDLE
+                            </span>
+                        </div>
+
+                        <!-- Challenge Instruction (Big Center Text) -->
+                        <div id="challenge-display" class="absolute bottom-10 px-6 py-3 bg-black/70 backdrop-blur-md rounded-full text-white font-medium text-lg border border-white/10 transform translate-y-2 opacity-0 transition-all duration-300">
+                            <!-- Text injected by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Controls Bar -->
+            <div class="glass rounded-xl p-4 flex flex-col md:flex-row gap-4 items-center justify-between">
+                <div class="flex-1 w-full md:w-auto">
+                    <div class="relative">
+                        <i class="fa-solid fa-user absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                        <input type="text" id="user-id" value="test_user_1" placeholder="User ID" 
+                               class="w-full bg-gray-800/50 border border-gray-700 rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-white placeholder-gray-500">
+                    </div>
+                </div>
+                <div class="flex gap-3 w-full md:w-auto">
+                    <button onclick="startEnroll()" id="btn-enroll" class="flex-1 md:flex-none px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-user-plus"></i> Enroll
+                    </button>
+                    <button onclick="startVerify()" id="btn-verify" class="flex-1 md:flex-none px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-check-circle"></i> Verify
+                    </button>
+                </div>
+            </div>
+
+            <!-- Proof Box (Hidden by default) -->
+            <div id="proof-box" class="hidden glass rounded-xl p-6 border-l-4 border-green-500 bg-green-900/10">
+                <div class="flex justify-between items-start mb-4">
+                    <h3 class="text-green-400 font-bold text-lg flex items-center gap-2">
+                        <i class="fa-solid fa-shield-halved"></i> Human Proof Generated
+                    </h3>
+                    <button onclick="copyProof()" class="text-gray-400 hover:text-white transition-colors text-sm">
+                        <i class="fa-regular fa-copy"></i> Copy JSON
+                    </button>
+                </div>
+                <pre id="proof-content" class="bg-black/50 rounded-lg p-4 text-xs font-mono text-green-300 overflow-x-auto border border-white/5"></pre>
+            </div>
+            
+            <!-- Error Message -->
+             <div id="error-msg" class="hidden px-4 py-3 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm flex items-center gap-3">
+                <i class="fa-solid fa-circle-exclamation"></i>
+                <span id="error-text">Error message here</span>
+            </div>
+
         </div>
 
-        <div class="controls">
-            <input type="text" id="user-id" placeholder="Enter User ID" value="test_user_1">
-            <button onclick="startEnroll()" id="btn-enroll">Enroll</button>
-            <button onclick="startVerify()" id="btn-verify">Verify</button>
+        <!-- Right Column: Stats & Guide -->
+        <div class="w-full lg:w-1/3 flex flex-col gap-6">
+            
+            <!-- Breathing Guide Visual -->
+            <div class="glass rounded-2xl p-6 flex flex-col items-center justify-center min-h-[200px] relative overflow-hidden">
+                <div class="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-purple-500/5"></div>
+                
+                <h3 class="text-gray-400 text-sm font-medium uppercase tracking-wider mb-6 z-10">Breath Rhythm</h3>
+                
+                <div class="relative w-32 h-32 flex items-center justify-center z-10">
+                    <!-- Outer Circles -->
+                    <div class="absolute inset-0 rounded-full border border-blue-500/20 breathing-circle" style="animation-delay: 0s"></div>
+                    <div class="absolute inset-0 rounded-full border border-blue-500/20 breathing-circle" style="animation-delay: 2s"></div>
+                    
+                    <!-- Core -->
+                    <div class="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full shadow-lg shadow-blue-500/30 flex items-center justify-center">
+                        <i class="fa-solid fa-lungs text-white/80 text-xl"></i>
+                    </div>
+                </div>
+                
+                <p class="text-xs text-gray-500 mt-6 text-center max-w-[200px]">
+                    Follow the rhythm. Breathe in as it expands, out as it contracts.
+                </p>
+            </div>
+
+            <!-- Metrics Grid -->
+            <div class="grid grid-cols-2 gap-4">
+                <!-- RPM Card -->
+                <div class="glass rounded-xl p-4 border-t-2 border-orange-500">
+                    <div class="text-gray-400 text-xs font-medium mb-1">Respiration Rate</div>
+                    <div class="flex items-baseline gap-1">
+                        <span id="rpm" class="text-2xl font-bold text-white">0.0</span>
+                        <span class="text-xs text-gray-500">rpm</span>
+                    </div>
+                    <div class="w-full bg-gray-700 h-1.5 rounded-full mt-3 overflow-hidden">
+                        <div id="rpm-bar" class="bg-orange-500 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- Signal Quality Card -->
+                <div class="glass rounded-xl p-4 border-t-2 border-purple-500">
+                    <div class="text-gray-400 text-xs font-medium mb-1">Signal Quality</div>
+                    <div class="flex items-baseline gap-1">
+                        <span id="quality" class="text-2xl font-bold text-white">0%</span>
+                    </div>
+                    <div class="w-full bg-gray-700 h-1.5 rounded-full mt-3 overflow-hidden">
+                        <div id="quality-bar" class="bg-purple-500 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Identity Match Card -->
+            <div class="glass rounded-xl p-4 border-t-2 border-cyan-500">
+                <div class="flex justify-between items-center mb-2">
+                    <div class="text-gray-400 text-xs font-medium">Biometric Match</div>
+                    <i class="fa-solid fa-fingerprint text-cyan-500/50"></i>
+                </div>
+                <div class="flex items-center gap-3">
+                     <div class="flex-1 bg-gray-700 h-2 rounded-full overflow-hidden">
+                        <div id="match-bar" class="bg-cyan-500 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+                    </div>
+                    <span id="match-score" class="text-sm font-bold text-cyan-400">--</span>
+                </div>
+            </div>
+
         </div>
+    </main>
 
-        <div id="challenge-display" class="challenge"></div>
-        <div id="error-msg" style="color: red; margin: 10px 0;"></div>
+    <footer class="p-6 text-center text-xs text-gray-600">
+        &copy; 2024 Proof of Humans Project. All rights reserved.
+    </footer>
 
-        <div id="status-panel">
-            <div class="status-item"><span class="status-label">Session State:</span> <span id="state">IDLE</span></div>
-            <div class="status-item"><span class="status-label">Face Detected:</span> <span id="face">No</span></div>
-            <div class="status-item"><span class="status-label">RPM:</span> <span id="rpm">0.0</span></div>
-            <div class="status-item"><span class="status-label">Signal Quality:</span> <span id="quality">0.0</span></div>
-        </div>
-
-        <div id="proof-box">
-            <h3>Human Proof Generated!</h3>
-            <pre id="proof-content"></pre>
-        </div>
-    </div>
-
+    <!-- Logic -->
     <script>
-        // Auto-detect API URL
+        // --- Configuration ---
         let API_URL = window.location.origin;
         if (API_URL === "null" || API_URL.startsWith("file://")) {
-            console.warn("Running from local file, forcing API to http://localhost:8000");
+            console.warn("Local file detected, forcing localhost:8000");
             API_URL = "http://localhost:8000";
         }
         
-        console.log("Using API URL:", API_URL);
+        // --- DOM Elements ---
+        const els = {
+            video: document.getElementById('video-feed'),
+            placeholder: document.getElementById('video-placeholder'),
+            status: {
+                online: document.getElementById('connection-online'),
+                offline: document.getElementById('connection-offline'), // Note: ID in HTML is connection-status (offline)
+                connection: document.getElementById('connection-status')
+            },
+            badges: {
+                face: document.getElementById('face-badge'),
+                state: document.getElementById('state-badge')
+            },
+            metrics: {
+                rpm: document.getElementById('rpm'),
+                rpmBar: document.getElementById('rpm-bar'),
+                quality: document.getElementById('quality'),
+                qualityBar: document.getElementById('quality-bar'),
+                matchBar: document.getElementById('match-bar'),
+                matchScore: document.getElementById('match-score')
+            },
+            ui: {
+                challenge: document.getElementById('challenge-display'),
+                proofBox: document.getElementById('proof-box'),
+                proofContent: document.getElementById('proof-content'),
+                errorMsg: document.getElementById('error-msg'),
+                errorText: document.getElementById('error-text'),
+                faceGuide: document.getElementById('face-guide'),
+                videoContainer: document.querySelector('.group') // For scan effect
+            },
+            inputs: {
+                userId: document.getElementById('user-id'),
+                btnEnroll: document.getElementById('btn-enroll'),
+                btnVerify: document.getElementById('btn-verify')
+            }
+        };
 
-        // Fix video source if running locally
-        const videoFeed = document.getElementById('video-feed');
-        if (videoFeed.getAttribute('src').startsWith('/')) {
-             videoFeed.src = `${API_URL}/video_feed`;
+        // --- State ---
+        let pollingInterval = null;
+        let isConnected = false;
+
+        // --- Initialization ---
+        // Fix video source
+        if (els.video.getAttribute('src').startsWith('/')) {
+             els.video.src = `${API_URL}/video_feed`;
         }
 
-        let pollingInterval = null;
-
-        // Check connection periodically
-        setInterval(async () => {
+        // --- Network Logic ---
+        async function checkConnection() {
             try {
                 await fetch(`${API_URL}/status`);
-                document.getElementById('connection-status').style.display = 'none';
-                document.getElementById('video-feed').style.display = 'block';
-                document.getElementById('video-placeholder').style.display = 'none';
+                if (!isConnected) {
+                    isConnected = true;
+                    els.status.connection.classList.add('hidden');
+                    document.getElementById('connection-online').classList.remove('hidden');
+                    els.video.style.display = 'block';
+                    els.placeholder.classList.add('hidden');
+                }
             } catch (e) {
-                document.getElementById('connection-status').style.display = 'block';
+                isConnected = false;
+                els.status.connection.classList.remove('hidden');
+                document.getElementById('connection-online').classList.add('hidden');
             }
-        }, 2000);
+        }
+        setInterval(checkConnection, 2000);
 
-        function showError(msg) {
-            const el = document.getElementById('error-msg');
-            el.innerText = msg;
-            setTimeout(() => el.innerText = '', 5000);
+        // --- API Calls ---
+        async function callApi(endpoint, userId) {
+            try {
+                const res = await fetch(`${API_URL}/${endpoint}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: userId })
+                });
+                if (!res.ok) throw new Error(await res.text());
+                return await res.json();
+            } catch (e) {
+                throw e;
+            }
         }
 
-        async function startEnroll() {
-            const userId = document.getElementById('user-id').value;
-            if (!userId) return alert("Enter User ID");
+        async function startSession(type) {
+            const userId = els.inputs.userId.value.trim();
+            if (!userId) {
+                showError("Please enter a User ID first.");
+                return;
+            }
+            
+            // Reset UI
+            hideError();
+            els.ui.proofBox.classList.add('hidden');
+            els.ui.challenge.style.opacity = '0';
             
             try {
-                const res = await fetch(`${API_URL}/enroll`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ user_id: userId })
-                });
-                if (!res.ok) throw new Error(await res.text());
-                const data = await res.json();
-                console.log(data);
+                const data = await callApi(type, userId);
+                console.log("Session started:", data);
+                
                 startPolling();
-                document.getElementById('challenge-display').innerText = "Please breathe naturally for 10 seconds...";
-                document.getElementById('proof-box').style.display = 'none';
+                
+                // Show initial instruction
+                showChallenge(type === 'enroll' ? "Breathe naturally..." : "Get ready...");
+                
             } catch (e) {
-                showError("Error starting enrollment: " + e.message);
+                showError(`Failed to start ${type}: ${e.message}`);
             }
         }
 
-        async function startVerify() {
-            const userId = document.getElementById('user-id').value;
-            if (!userId) return alert("Enter User ID");
+        window.startEnroll = () => startSession('enroll');
+        window.startVerify = () => startSession('verify');
 
-            try {
-                const res = await fetch(`${API_URL}/verify`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ user_id: userId })
-                });
-                if (!res.ok) throw new Error(await res.text());
-                const data = await res.json();
-                console.log(data);
-                startPolling();
-                document.getElementById('challenge-display').innerText = "Perform a DEEP BREATH now!";
-                document.getElementById('proof-box').style.display = 'none';
-            } catch (e) {
-                showError("Error starting verification: " + e.message);
-            }
-        }
-
+        // --- Polling Logic ---
         function startPolling() {
             if (pollingInterval) clearInterval(pollingInterval);
             pollingInterval = setInterval(pollStatus, 500);
+            
+            // Add scanning effect
+            els.ui.faceGuide.classList.add('scanning');
+            els.ui.faceGuide.classList.replace('border-white/30', 'border-blue-500/80');
+        }
+
+        function stopPolling() {
+            if (pollingInterval) clearInterval(pollingInterval);
+            pollingInterval = null;
+            
+            // Remove scanning effect
+            els.ui.faceGuide.classList.remove('scanning');
+            els.ui.faceGuide.classList.replace('border-blue-500/80', 'border-white/30');
         }
 
         async function pollStatus() {
@@ -140,24 +394,89 @@
                 const res = await fetch(`${API_URL}/status`);
                 const status = await res.json();
                 
-                document.getElementById('state').innerText = status.state;
-                document.getElementById('face').innerText = status.face_detected ? "YES" : "NO";
-                document.getElementById('rpm').innerText = status.rpm.toFixed(1);
-                document.getElementById('quality').innerText = (status.signal_quality * 100).toFixed(0) + "%";
+                updateUI(status);
 
                 if (status.state === "COMPLETED" && status.proof) {
-                    clearInterval(pollingInterval);
-                    document.getElementById('proof-box').style.display = 'block';
-                    document.getElementById('proof-content').innerText = JSON.stringify(status.proof, null, 2);
-                    document.getElementById('challenge-display').innerText = "Success!";
+                    stopPolling();
+                    showSuccess(status.proof);
                 } else if (status.state === "FAILED") {
-                    clearInterval(pollingInterval);
-                    document.getElementById('challenge-display').innerText = "Failed / Timeout";
+                    stopPolling();
+                    showChallenge("Session Failed / Timeout");
+                    setTimeout(() => els.ui.challenge.style.opacity = '0', 3000);
                 }
 
             } catch (e) {
                 console.error("Polling error", e);
             }
+        }
+
+        // --- UI Updates ---
+        function updateUI(status) {
+            // State Badge
+            els.badges.state.innerText = status.state;
+            if (status.state === "ENROLLING") els.badges.state.className = "px-3 py-1 bg-blue-600/80 backdrop-blur-md rounded-full text-xs font-semibold text-white border border-blue-400/30";
+            else if (status.state === "VERIFYING") els.badges.state.className = "px-3 py-1 bg-emerald-600/80 backdrop-blur-md rounded-full text-xs font-semibold text-white border border-emerald-400/30";
+            else els.badges.state.className = "px-3 py-1 bg-gray-600/80 backdrop-blur-md rounded-full text-xs font-semibold text-white border border-gray-400/30";
+
+            // Face Badge
+            if (status.face_detected) {
+                els.badges.face.innerHTML = '<i class="fa-solid fa-face-smile mr-1"></i> Face Detected';
+                els.badges.face.className = "px-3 py-1 bg-green-500/20 backdrop-blur-md rounded-full text-xs font-semibold text-green-400 border border-green-500/30";
+                els.ui.faceGuide.classList.replace('border-white/30', 'border-green-500/50');
+            } else {
+                els.badges.face.innerHTML = '<i class="fa-solid fa-user-xmark mr-1"></i> No Face';
+                els.badges.face.className = "px-3 py-1 bg-red-500/20 backdrop-blur-md rounded-full text-xs font-semibold text-red-400 border border-red-500/30";
+                if (!pollingInterval) els.ui.faceGuide.classList.replace('border-green-500/50', 'border-white/30');
+            }
+
+            // Metrics
+            els.metrics.rpm.innerText = status.rpm.toFixed(1);
+            // RPM bar scaling (assume max 30 for visualization)
+            const rpmPercent = Math.min((status.rpm / 30) * 100, 100);
+            els.metrics.rpmBar.style.width = `${rpmPercent}%`;
+
+            const qualityPercent = (status.signal_quality * 100).toFixed(0);
+            els.metrics.quality.innerText = `${qualityPercent}%`;
+            els.metrics.qualityBar.style.width = `${qualityPercent}%`;
+            
+            // Dynamic color for quality
+            if (status.signal_quality > 0.7) els.metrics.qualityBar.className = "bg-green-500 h-full rounded-full transition-all duration-500";
+            else if (status.signal_quality > 0.4) els.metrics.qualityBar.className = "bg-yellow-500 h-full rounded-full transition-all duration-500";
+            else els.metrics.qualityBar.className = "bg-red-500 h-full rounded-full transition-all duration-500";
+        }
+
+        function showChallenge(text) {
+            els.ui.challenge.innerText = text;
+            els.ui.challenge.style.opacity = '1';
+        }
+
+        function showSuccess(proof) {
+            els.ui.proofBox.classList.remove('hidden');
+            els.ui.proofContent.innerText = JSON.stringify(proof, null, 2);
+            showChallenge("Success!");
+            
+            // Update Match Score if present
+            if (proof.identity_score) {
+                els.metrics.matchScore.innerText = proof.identity_score.toFixed(2);
+                els.metrics.matchBar.style.width = `${proof.identity_score * 100}%`;
+            }
+        }
+
+        function showError(msg) {
+            els.ui.errorText.innerText = msg;
+            els.ui.errorMsg.classList.remove('hidden');
+            setTimeout(() => els.ui.errorMsg.classList.add('hidden'), 5000);
+        }
+
+        function hideError() {
+            els.ui.errorMsg.classList.add('hidden');
+        }
+
+        window.copyProof = () => {
+            const content = els.ui.proofContent.innerText;
+            navigator.clipboard.writeText(content).then(() => {
+                alert("Proof JSON copied to clipboard!");
+            });
         }
     </script>
 </body>
